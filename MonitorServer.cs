@@ -101,16 +101,8 @@ namespace TouchPadPCServer
                         break;
                     }
 
-                    byte[] datas = Encoding.UTF8.GetBytes(SERVER_TAG);
-                    long dataLen = datas.LongLength;
-                    if (BitConverter.IsLittleEndian)
-                    {
-                        dataLen = IPAddress.HostToNetworkOrder(dataLen);
-                    }
-                    byte[] lenBytes = BitConverter.GetBytes(dataLen);
-                    client.Send(lenBytes);
-                    client.Send(datas);
-                    client.Close();
+                    // start a new thead to handle accepted client socket
+                    new Thread(HandleClientThreadProc).Start(client);
                 }
             }
             catch (Exception ex)
@@ -121,7 +113,84 @@ namespace TouchPadPCServer
             System.Diagnostics.Debug.WriteLine("Listen thread is exiting.");
         }
 
+        private void HandleClientThreadProc(object threadContext)
+        {
+            Socket client = threadContext as Socket;
+            if (client == null)
+            {
+                System.Diagnostics.Debug.WriteLine("In HandleClientThreadProc, client is null, just return.");
+                return;
+            }
+
+            int timeoutflag = 0;
+            Timer timer = null;
+            byte[] revDatas = new byte[1024];
+            ManualResetEvent threadExitEvent = new ManualResetEvent(false);
+
+            // 1 read datas from client
+            IAsyncResult res = client.BeginReceive(revDatas, 0, 1024, SocketFlags.None,
+                new AsyncCallback(state => {
+                    System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) ok, async receive callback going.");
+                    if (Interlocked.CompareExchange(ref timeoutflag, 1, 0) != 0)
+                    {
+                        // the flag was set elsewhere, so return immediately.
+                        return;
+                    }
+                    System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) ok, going to read client data.");
+                    // we set the flag to 1, indicating it was completed.
+                    if (timer != null)
+                    {
+                        // stop the timer from firing.
+                        timer.Dispose();
+                    }
+                    // process the read.
+                    int revLen = client.EndReceive(state);
+                    string revStr = Encoding.UTF8.GetString(revDatas, 0, revLen);
+                    System.Diagnostics.Debug.WriteLine("Datas from client: " + revStr);
+                    if (revStr.Equals(CLIENT_DETECT_SERVER_TAG))
+                    {
+                        // 2 if data from client indicate that client is detecting server,
+                        // then send server tag to client
+                        byte[] datas = Encoding.UTF8.GetBytes(SERVER_TAG);
+                        long dataLen = datas.LongLength;
+                        if (BitConverter.IsLittleEndian)
+                        {
+                            dataLen = IPAddress.HostToNetworkOrder(dataLen);
+                        }
+                        byte[] lenBytes = BitConverter.GetBytes(dataLen);
+                        client.Send(lenBytes);
+                        client.Send(datas);
+                    }
+                    client.Close();
+                    threadExitEvent.Set();
+                }), null);
+
+            if (!res.IsCompleted)
+            {
+                timer = new Timer(state =>
+                    {
+                        System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) ok, timeout callback going.");
+                        if (Interlocked.CompareExchange(ref timeoutflag, 1, 0) != 0)
+                        {
+                            // the flag was set elsewhere, so return immediately.
+                            return;
+                        }
+                        System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) ok, timeout.");
+                        // we set the flag to 2, indicating a timeout was hit.
+                        timer.Dispose();
+                        client.Close();
+                        threadExitEvent.Set();
+                    }, null, 2000, Timeout.Infinite);
+            }
+
+            System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) wait thread exit.");
+            threadExitEvent.WaitOne();
+            threadExitEvent.Dispose();
+            System.Diagnostics.Debug.WriteLine("HandleClientThreadProc(...) exit.");
+        }
+
         private const int DEFAULT_PORT = 8123;
         private const string SERVER_TAG = "Yes, I am server.";
+        private const string CLIENT_DETECT_SERVER_TAG = "Are you a server.";
     }
 }
