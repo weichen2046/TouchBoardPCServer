@@ -15,6 +15,7 @@ namespace TouchPadPCServer
         {
             InitializeComponent();
             this.ShowInTaskbar = false;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.SizableToolWindow;
             this.WindowState = FormWindowState.Minimized;
         }
 
