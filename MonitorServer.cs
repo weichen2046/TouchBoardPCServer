@@ -65,6 +65,11 @@ namespace TouchPadPCServer
                         dummy.Close();
                     }
                 }
+                if (server != null)
+                {
+                    server.Stop();
+                    server = null;
+                }
             }
         }
 
@@ -160,8 +165,14 @@ namespace TouchPadPCServer
                         byte[] lenBytes = BitConverter.GetBytes(dataLen);
                         client.Send(lenBytes);
                         client.Send(datas);
+                        client.Close();
                     }
-                    client.Close();
+                    else if (revStr.Equals(TIME_TUNNEL_TAG))
+                    {
+                        // new a thread to hold this client socket to communicate with phone side
+                        server = new Server(client);
+                        server.Start();
+                    }
                     threadExitEvent.Set();
                 }), null);
 
@@ -192,5 +203,7 @@ namespace TouchPadPCServer
         private const int DEFAULT_PORT = 8123;
         private const string SERVER_TAG = "Yes, I am server.";
         private const string CLIENT_DETECT_SERVER_TAG = "Are you a server.";
+        private const string TIME_TUNNEL_TAG = "Time Tunnel.";
+        private Server server = null;
     }
 }
