@@ -8,9 +8,39 @@ using System.Net;
 
 namespace TouchPadPCServer
 {
-    public class Server
+    enum TransmitControlTag
     {
-        public Server(Socket socket)
+        Data = 1,
+        Quit = 0xFFFF, // 0xFFFFFFFE
+        Unknown = -1
+    }
+
+    public class DataArrivedEventArgs : EventArgs
+    {
+        private byte[] data;
+        public DataArrivedEventArgs(byte[] data)
+        {
+            this.data = data;
+        }
+
+        public byte[] Data
+        {
+            get { return data; }
+        }
+    }
+
+    public delegate void DataArrivedEventHandler(object sender, DataArrivedEventArgs args);
+    public delegate void QuitEventHanlder(object sender, EventArgs args);
+
+    public class TimeMachine
+    {
+        /// <summary>
+        /// 退出事件
+        /// </summary>
+        public event DataArrivedEventHandler DataArrivedEvent;
+        public event QuitEventHanlder QuitEvent;
+
+        public TimeMachine(Socket socket)
         {
             this.client = socket;
         }
@@ -20,6 +50,7 @@ namespace TouchPadPCServer
             if (workingThread == null)
             {
                 workingThread = new Thread(WorkingThreadProc);
+                workingThread.Name = "TimeMachineThread";
                 workingThread.Start(this);
             }
         }
@@ -139,38 +170,69 @@ namespace TouchPadPCServer
             return null;
         }
 
-        private bool IsExitTag(byte[] data)
+        private TransmitControlTag GetTransmitControlTag()
         {
-            if (data == null)
-                return true;
-            if(data.Length == EXIT_TAG_LEN
-                && Encoding.UTF8.GetString(data).Equals(EXIT_TAG))
-                return true;
-            return false;
+            // read TRANSMIT_CONTROL_TAG_LEN bytes
+            byte[] tagBytes = GetSpecificLenData(TRANSMIT_CONTROL_TAG_LEN);
+            if (tagBytes != null && tagBytes.Length == TRANSMIT_CONTROL_TAG_LEN)
+            {
+                // TODO if TRANSMIT_CONTROL_TAG_LEN not 4 byte, there will be a bug
+                int tagInt = BitConverter.ToInt32(tagBytes, 0);
+                if (BitConverter.IsLittleEndian)
+                {
+                    tagInt = IPAddress.NetworkToHostOrder(tagInt);
+                }
+                // TODO if tagInt can not map to TransmitControlTag enum
+                // then need to do something here
+                return (TransmitControlTag)tagInt;
+            }
+            return TransmitControlTag.Unknown;
+        }
+
+        private void OnQuit(EventArgs args)
+        {
+            if (QuitEvent != null)
+                QuitEvent(this, args);
+        }
+
+        private void OnDataArrived(DataArrivedEventArgs args)
+        {
+            if (DataArrivedEvent != null)
+                DataArrivedEvent(this, args);
         }
 
         private void WorkingThreadProc(object threadContext)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Server working thread running...");
+                System.Diagnostics.Debug.WriteLine("Time machine working thread running...");
                 SendResponseOK();
                 while (true)
                 {
-                    // read client data
-                    byte[] received = ReadData();
-
-                    if (IsExitTag(received))
-                        break;
-
-                    // going to handle received data
+                    // read transmit control tag
+                    switch (GetTransmitControlTag())
+                    {
+                        case TransmitControlTag.Data:
+                            // read client data
+                            byte[] received = ReadData();
+                            // fire data arrived event
+                            OnDataArrived(new DataArrivedEventArgs(received));
+                            break;
+                        case TransmitControlTag.Quit:
+                            // fire quit event
+                            OnQuit(new EventArgs());
+                            break;
+                        default:
+                            System.Diagnostics.Debug.WriteLine("TimeMachine received unknown transmit control tag.");
+                            break;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
-            System.Diagnostics.Debug.WriteLine("Server working thread exit...");
+            System.Diagnostics.Debug.WriteLine("Time machine working thread exit...");
         }
 
         private Socket client;
@@ -180,7 +242,6 @@ namespace TouchPadPCServer
         /// 存放接收数据长度缓存的字节数，这里使用8个字节
         /// </summary>
         private const int MESSAGE_LEN_BUFFER = 8;
-        private const string EXIT_TAG = "Exit.";
-        private const int EXIT_TAG_LEN = 5; // 5 == Encoding.UTF8.GetByteCount(EXIT_TAG);
+        private const int TRANSMIT_CONTROL_TAG_LEN = 4;
     }
 }

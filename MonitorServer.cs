@@ -65,11 +65,10 @@ namespace TouchPadPCServer
                         dummy.Close();
                     }
                 }
-                if (server != null)
-                {
-                    server.Stop();
-                    server = null;
-                }
+                // TODO maybe at this time, I dont need to stop the simulate engine
+                // because if we don't need to listen, we still can use simulate
+                // engine with transmit socket previous accept
+                SimulateEngine.Instance.Stop();
             }
         }
 
@@ -170,8 +169,7 @@ namespace TouchPadPCServer
                     else if (revStr.Equals(TIME_TUNNEL_TAG))
                     {
                         // new a thread to hold this client socket to communicate with phone side
-                        server = new Server(client);
-                        server.Start();
+                        SimulateEngine.Instance.Start(client);
                     }
                     threadExitEvent.Set();
                 }), null);
@@ -204,6 +202,5 @@ namespace TouchPadPCServer
         private const string SERVER_TAG = "Yes, I am server.";
         private const string CLIENT_DETECT_SERVER_TAG = "Are you a server.";
         private const string TIME_TUNNEL_TAG = "Time Tunnel.";
-        private Server server = null;
     }
 }
