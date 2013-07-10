@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Net.Sockets;
 using System.Threading;
+using WindowsInput;
 
 namespace TouchPadPCServer
 {
@@ -36,7 +37,7 @@ namespace TouchPadPCServer
                 mReceiver = new EventReceiver(new TimeMachine(tunnel));
 
                 // set listeners to mReceiver
-
+                RegisterEvent();
                 mReceiver.Start();
             }
         }
@@ -50,6 +51,26 @@ namespace TouchPadPCServer
                 // TODO other operations
                 mReceiver.Stop();
             }
+        }
+
+        private void RegisterEvent()
+        {
+            if (mReceiver == null)
+                throw new Exception("mReceiver can't be null.");
+
+            mReceiver.ClickEvent += new ClickEventHandler(mReceiver_ClickEvent);
+            mReceiver.QuitEvent += new QuitEventHanlder(mReceiver_QuitEvent);
+        }
+
+        private void mReceiver_ClickEvent(object sender, EventArgs args)
+        {
+            var sim = new InputSimulator();
+            sim.Mouse.LeftButtonClick();
+        }
+
+        private void mReceiver_QuitEvent(object sender, EventArgs args)
+        {
+            started = false;
         }
 
         private bool started = false;
