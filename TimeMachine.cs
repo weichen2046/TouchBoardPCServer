@@ -59,7 +59,7 @@ namespace TouchPadPCServer
         {
             if (workingThread != null)
             {
-                System.Diagnostics.Debug.WriteLine("Going to stop server.");
+                System.Diagnostics.Debug.WriteLine("Going to stop TimeMachine.");
                 client.Close();
                 client = null;
                 workingThread.Abort();
@@ -124,8 +124,7 @@ namespace TouchPadPCServer
                 {
                     dataLen = IPAddress.NetworkToHostOrder(dataLen);
                 }
-                System.Diagnostics.Debug.WriteLine("Going to receive data length is "
-                    + dataLen.ToString());
+
                 received = GetSpecificLenData(dataLen);
             }
             catch (Exception ex)
@@ -138,6 +137,8 @@ namespace TouchPadPCServer
 
         private byte[] GetSpecificLenData(long totalLen)
         {
+            System.Diagnostics.Debug.WriteLine("GetSpecificLenData(...), Going to receive data length is "
+                    + totalLen.ToString());
             List<byte> bytesRet = new List<byte>();
             byte[] datas = new byte[4096];
 
@@ -174,6 +175,10 @@ namespace TouchPadPCServer
         {
             // read TRANSMIT_CONTROL_TAG_LEN bytes
             byte[] tagBytes = GetSpecificLenData(TRANSMIT_CONTROL_TAG_LEN);
+            System.Diagnostics.Debug.WriteLineIf((tagBytes == null),
+                "Can not receive transmit control tag, tagBytes = null.");
+            System.Diagnostics.Debug.WriteLineIf((tagBytes != null),
+                "Received tarnsmit control tag, tagBytes.Length: " + tagBytes.Length);
             if (tagBytes != null && tagBytes.Length == TRANSMIT_CONTROL_TAG_LEN)
             {
                 // TODO if TRANSMIT_CONTROL_TAG_LEN not 4 byte, there will be a bug
@@ -182,10 +187,12 @@ namespace TouchPadPCServer
                 {
                     tagInt = IPAddress.NetworkToHostOrder(tagInt);
                 }
+                System.Diagnostics.Debug.WriteLine("Transmit control tag int: " + tagInt.ToString());
                 // TODO if tagInt can not map to TransmitControlTag enum
                 // then need to do something here
                 return (TransmitControlTag)tagInt;
             }
+
             return TransmitControlTag.Unknown;
         }
 
@@ -205,7 +212,7 @@ namespace TouchPadPCServer
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Time machine working thread running...");
+                System.Diagnostics.Debug.WriteLine("TimeMachine working thread running...");
                 SendResponseOK();
                 while (true)
                 {
@@ -232,7 +239,7 @@ namespace TouchPadPCServer
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
-            System.Diagnostics.Debug.WriteLine("Time machine working thread exit...");
+            System.Diagnostics.Debug.WriteLine("TimeMachine working thread exit.");
         }
 
         private Socket client;

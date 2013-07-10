@@ -164,7 +164,7 @@ namespace TouchPadPCServer
                         byte[] lenBytes = BitConverter.GetBytes(dataLen);
                         client.Send(lenBytes);
                         client.Send(datas);
-                        client.Close();
+                        client.Close(1);
                     }
                     else if (revStr.Equals(TIME_TUNNEL_TAG))
                     {

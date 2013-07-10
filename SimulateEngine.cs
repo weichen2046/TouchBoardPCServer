@@ -28,6 +28,7 @@ namespace TouchPadPCServer
 
         public void Start(Socket tunnel)
         {
+            System.Diagnostics.Debug.WriteLine("SimulateEngine.Start(...) called.");
             if (!started)
             {
                 started = true;
@@ -42,6 +43,7 @@ namespace TouchPadPCServer
 
         public void Stop()
         {
+            System.Diagnostics.Debug.WriteLine("SimulateEngine.Stop() called.");
             if (started)
             {
                 started = false;

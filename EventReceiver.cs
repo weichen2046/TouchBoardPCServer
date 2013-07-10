@@ -17,7 +17,8 @@ namespace TouchPadPCServer
 
         public void Start()
         {
-            if (mTimeMachine == null)
+            System.Diagnostics.Debug.WriteLine("EventReceiver.Start(...) called.");
+            if (mTimeMachine != null)
             {
                 Interlocked.Exchange(ref mStopWork, 0);
 
@@ -25,7 +26,7 @@ namespace TouchPadPCServer
 
                 mSign = new AutoResetEvent(false);
                 mWorkingThread = new Thread(WorkingThreadProc);
-                mWorkingThread.Start(null);
+                mWorkingThread.Start();
 
                 mTimeMachine.Start();
             }
@@ -33,6 +34,7 @@ namespace TouchPadPCServer
 
         public void Stop()
         {
+            System.Diagnostics.Debug.WriteLine("EventReceiver.Stop() called.");
             if (mTimeMachine != null)
             {
                 mTimeMachine.Stop();
@@ -46,10 +48,8 @@ namespace TouchPadPCServer
 
         private void mTimeMachine_DataArrivedEvent(object sender, DataArrivedEventArgs args)
         {
-            // I want to know whether this callback runing in timemachine working thread
-            // if it is, I want another standalone thread to handle all datas
-            // TODO
-            System.Diagnostics.Debug.WriteLine(Thread.CurrentThread.Name);
+            // This callback running in TimeMachine working thread
+            System.Diagnostics.Debug.WriteLine("New data from TimeMachine arrived.");
 
             long avai = Interlocked.Read(ref mAvai);
             mDataBuffer[avai] = args;
@@ -65,6 +65,7 @@ namespace TouchPadPCServer
                 Interlocked.Exchange(ref mAvai, allocateNextAvai);
                 mSign.Set();
             }
+            System.Diagnostics.Debug.WriteLine("Next store data index: " + allocateNextAvai.ToString());
         }
 
         private void mTimeMachine_QuitEvent(object sender, EventArgs args)
@@ -73,25 +74,31 @@ namespace TouchPadPCServer
 
         private void WorkingThreadProc()
         {
+            System.Diagnostics.Debug.WriteLine("EventReceiver working thread running...");
             while (true)
             {
                 mSign.WaitOne();
                 long exit = Interlocked.Read(ref mStopWork);
                 if (exit == 1)
                 {
+                    System.Diagnostics.Debug.WriteLine("Going to stop EventReceiver working thread.");
                     mSign.Dispose();
                     break;
                 }
 
                 while (true)
                 {
+                    System.Diagnostics.Debug.WriteLine("Still have data in buffer not processed.");
                     // consume data in buffer
                     long data = Interlocked.Read(ref mData);
+                    System.Diagnostics.Debug.WriteLineIf((data == mPreProcessedIndex),
+                        "No new data need to process, break while.");
                     if (data == mPreProcessedIndex)
                         break;
 
                     // process data
-                    System.Diagnostics.Debug.WriteLine("Processed data at " + data.ToString());
+                    System.Diagnostics.Debug.WriteLine("Processed data at " 
+                        + (mPreProcessedIndex+1).ToString());
                     mPreProcessedIndex = data;
 
                     long nextData = (mPreProcessedIndex + 1) % DATA_BUFFER_LEN;
@@ -105,8 +112,10 @@ namespace TouchPadPCServer
                     {
                         Interlocked.Exchange(ref mData, nextData);
                     }
+                    System.Diagnostics.Debug.WriteLine("Next process data index: " + nextData);
                 }
             }
+            System.Diagnostics.Debug.WriteLine("EventReceiver working thread exit.");
         }
 
         private TimeMachine mTimeMachine = null;
