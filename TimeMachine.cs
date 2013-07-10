@@ -57,13 +57,18 @@ namespace TouchPadPCServer
 
         public void Stop()
         {
+            System.Diagnostics.Debug.WriteLine("TimeMachine.Stop() called.");
             if (workingThread != null)
             {
-                System.Diagnostics.Debug.WriteLine("Going to stop TimeMachine.");
+                System.Diagnostics.Debug.WriteLine("TimeMachine workingThread is not null.");
                 client.Close();
                 client = null;
-                workingThread.Abort();
-                workingThread = null;
+                if (workingThread.IsAlive)
+                {
+                    System.Diagnostics.Debug.WriteLine("TimeMachine workingThread is alive, going to abort it.");
+                    workingThread.Abort();
+                    workingThread = null;
+                }
             }
         }
 
@@ -214,6 +219,7 @@ namespace TouchPadPCServer
             {
                 System.Diagnostics.Debug.WriteLine("TimeMachine working thread running...");
                 SendResponseOK();
+                bool exitAll = false;
                 while (true)
                 {
                     // read transmit control tag
@@ -228,17 +234,21 @@ namespace TouchPadPCServer
                         case TransmitControlTag.Quit:
                             // fire quit event
                             OnQuit(new EventArgs());
+                            exitAll = true;
                             break;
                         default:
                             System.Diagnostics.Debug.WriteLine("TimeMachine received unknown transmit control tag.");
                             break;
                     }
+                    if (exitAll)
+                        break;
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
+            
             System.Diagnostics.Debug.WriteLine("TimeMachine working thread exit.");
         }
 
