@@ -22,10 +22,12 @@ namespace TouchPadPCServer
         MOVE = 1,
         CLICK = 2,
         DOUBLE_CLICK = 3,
-        Unknown = -1
+        UNKNOWN = -1
     }
 
     public delegate void ClickEventHandler(object sender, EventArgs args);
+    public delegate void DoubleClickHandler(object sender, EventArgs args);
+    public delegate void RightClickHandler(object sender, EventArgs args);
 
     public class EventReceiver
     {
@@ -34,9 +36,13 @@ namespace TouchPadPCServer
             mTimeMachine = tunnel;
             mTimeMachine.DataArrivedEvent += new DataArrivedEventHandler(mTimeMachine_DataArrivedEvent);
             mTimeMachine.QuitEvent += new QuitEventHanlder(mTimeMachine_QuitEvent);
+
+            mMotionEventTracker = new MotionEventTracker();
         }
 
         public event ClickEventHandler ClickEvent;
+        public event DoubleClickHandler DoubleClickEvent;
+        public event RightClickHandler RightClickEvent;
         public event QuitEventHanlder QuitEvent;
 
         public void Start()
@@ -132,9 +138,10 @@ namespace TouchPadPCServer
         {
             if (data == null)
                 throw new ArgumentNullException("data", "Parameter data can not be null.");
-
+            // reset parsed bytes count to zero
+            mParsedBytes = 0;
             // read event tag
-            switch (GetEventTag(data.Data))
+            switch (GetEventTag(data.Data, ref mParsedBytes))
             {
                 case EventTag.CLICK:
                     System.Diagnostics.Debug.WriteLine("Click event received from timemachine.");
@@ -142,6 +149,7 @@ namespace TouchPadPCServer
                     break;
                 case EventTag.MOTION:
                     System.Diagnostics.Debug.WriteLine("Motion event received from timemachine.");
+                    HandleMotionEvent(data.Data, ref mParsedBytes);
                     break;
                 default:
                     System.Diagnostics.Debug.WriteLine("Unknown event received from timemachine.");
@@ -149,12 +157,13 @@ namespace TouchPadPCServer
             }
         }
 
-        private EventTag GetEventTag(byte[] data)
+        private EventTag GetEventTag(byte[] data, ref int parsed)
         {
             if (data == null || data.Length < INT_SIZE)
                 throw new ArgumentNullException("data", "Parameter data can not be null.");
 
-            int tagInt = BitConverter.ToInt32(data, 0);
+            int tagInt = BitConverter.ToInt32(data, parsed);
+            parsed += INT_SIZE;
             if (BitConverter.IsLittleEndian)
                 tagInt = IPAddress.NetworkToHostOrder(tagInt);
             try
@@ -171,10 +180,73 @@ namespace TouchPadPCServer
             return EventTag.Unknown;
         }
 
+        private void HandleMotionEvent(byte[] data, ref int parsed)
+        {
+            if(data == null)
+                throw new ArgumentNullException("data", "Parameter data can not be null.");
+            MotionEvent motion = MotionEvent.CreateFrom(data, parsed);
+            parsed += motion.TotalBytes;
+
+            if (motion.Action == MotionEventAction.ACTION_DOWN)
+                mMotionEventTracker.Reset();
+            mMotionEventTracker.Add(motion);
+
+            switch (motion.Action)
+            {
+                case MotionEventAction.ACTION_DOWN:
+                    HandleGestureStart();
+                    break;
+                case MotionEventAction.ACTION_UP:
+                    HandleGestureFinish();
+                    break;
+                case MotionEventAction.ACTION_MOVE:
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void HandleGestureStart()
+        {
+        }
+
+        private void HandleGestureFinish()
+        {
+            System.Diagnostics.Debug.WriteLine(
+                string.Format("HandleGestrueFinish() called. Max pointer count = {0}",
+                mMotionEventTracker.MaxPointerCount));
+            if (mMotionEventTracker.MaxPointerCount == 2)
+            {
+                // fire right click event
+                OnRightClick(new EventArgs());
+            }
+            else if (mMotionEventTracker.MaxPointerCount == 1)
+            {
+                // of course, this need to be refect
+                // because, if we tap and move with one finger
+                // I don't want fire Click event in this situation
+                OnClick(new EventArgs());
+            }
+        }
+
         private void OnClick(EventArgs args)
         {
+            System.Diagnostics.Debug.WriteLine("Fire click event.");
             if (ClickEvent != null)
                 ClickEvent(this, args);
+        }
+
+        private void OnDoubleClick(EventArgs args)
+        {
+            if (DoubleClickEvent != null)
+                DoubleClickEvent(this, args);
+        }
+
+        private void OnRightClick(EventArgs args)
+        {
+            System.Diagnostics.Debug.WriteLine("Fire right click event.");
+            if (RightClickEvent != null)
+                RightClickEvent(this, args);
         }
 
         private void OnQuit(EventArgs args)
@@ -197,5 +269,8 @@ namespace TouchPadPCServer
         private long mStopWork;
 
         private const int INT_SIZE = 4;
+        private int mParsedBytes;
+
+        private MotionEventTracker mMotionEventTracker;
     }
 }

@@ -50,9 +50,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommonConstans.cs" />
     <Compile Include="EventReceiver.cs" />
+    <Compile Include="Log.cs" />
     <Compile Include="MonitorServer.cs" />
     <Compile Include="MotionEvent.cs" />
+    <Compile Include="MotionEventTracker.cs" />
     <Compile Include="SimulateEngine.cs" />
     <Compile Include="TimeMachine.cs" />
     <Compile Include="SettingForm.cs">

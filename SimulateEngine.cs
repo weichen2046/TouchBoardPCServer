@@ -34,6 +34,8 @@ namespace TouchPadPCServer
             {
                 started = true;
 
+                sim = new InputSimulator();
+
                 mReceiver = new EventReceiver(new TimeMachine(tunnel));
 
                 // set listeners to mReceiver
@@ -59,13 +61,23 @@ namespace TouchPadPCServer
                 throw new Exception("mReceiver can't be null.");
 
             mReceiver.ClickEvent += new ClickEventHandler(mReceiver_ClickEvent);
+            //mReceiver.DoubleClickEvent += new DoubleClickHandler(mReceiver_DoubleClickEvent);
+            mReceiver.RightClickEvent += new RightClickHandler(mReceiver_RightClickEvent);
             mReceiver.QuitEvent += new QuitEventHanlder(mReceiver_QuitEvent);
         }
 
         private void mReceiver_ClickEvent(object sender, EventArgs args)
         {
-            var sim = new InputSimulator();
             sim.Mouse.LeftButtonClick();
+        }
+
+        //private void mReceiver_DoubleClickEvent(object sender, EventArgs args)
+        //{
+        //}
+
+        private void mReceiver_RightClickEvent(object sender, EventArgs args)
+        {
+            sim.Mouse.RightButtonClick();
         }
 
         private void mReceiver_QuitEvent(object sender, EventArgs args)
@@ -75,5 +87,6 @@ namespace TouchPadPCServer
 
         private bool started = false;
         private EventReceiver mReceiver;
+        private InputSimulator sim;
     }
 }
