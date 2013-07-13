@@ -17,6 +17,13 @@ namespace TouchPadPCServer
             this.ShowInTaskbar = false;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.SizableToolWindow;
             this.WindowState = FormWindowState.Minimized;
+            this.VisibleChanged += new EventHandler(UnVisibleForm_VisibleChanged);
+        }
+
+        private void UnVisibleForm_VisibleChanged(object sender, EventArgs e)
+        {
+            if (this.Visible)
+                this.Visible = false;
         }
 
         private void ToolStripMenuItemExit_Click(object sender, EventArgs e)
