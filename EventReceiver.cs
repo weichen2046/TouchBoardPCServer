@@ -25,9 +25,21 @@ namespace TouchPadPCServer
         UNKNOWN = -1
     }
 
+    public class MoveEventArgs : EventArgs
+    {
+        public double XDis { get; set; }
+        public double YDis { get; set; }
+        public MoveEventArgs(double xDis, double yDis)
+        {
+            XDis = xDis;
+            YDis = yDis;
+        }
+    }
+
     public delegate void ClickEventHandler(object sender, EventArgs args);
     public delegate void DoubleClickHandler(object sender, EventArgs args);
     public delegate void RightClickHandler(object sender, EventArgs args);
+    public delegate void MoveEventHandler(object sender, MoveEventArgs args);
 
     public class EventReceiver
     {
@@ -44,6 +56,7 @@ namespace TouchPadPCServer
         public event DoubleClickHandler DoubleClickEvent;
         public event RightClickHandler RightClickEvent;
         public event QuitEventHanlder QuitEvent;
+        public event MoveEventHandler MoveEvent;
 
         public void Start()
         {
@@ -79,7 +92,7 @@ namespace TouchPadPCServer
         private void mTimeMachine_DataArrivedEvent(object sender, DataArrivedEventArgs args)
         {
             // This callback running in TimeMachine working thread
-            System.Diagnostics.Debug.WriteLine("New data from TimeMachine arrived.");
+            //System.Diagnostics.Debug.WriteLine("New data from TimeMachine arrived.");
             lock (mLockObjForQueue)
             {
                 mDataBuffer.Enqueue(args);
@@ -144,15 +157,15 @@ namespace TouchPadPCServer
             switch (GetEventTag(data.Data, ref mParsedBytes))
             {
                 case EventTag.CLICK:
-                    System.Diagnostics.Debug.WriteLine("Click event received from timemachine.");
+                    //System.Diagnostics.Debug.WriteLine("Click event received from timemachine.");
                     OnClick(new EventArgs());
                     break;
                 case EventTag.MOTION:
-                    System.Diagnostics.Debug.WriteLine("Motion event received from timemachine.");
+                    //System.Diagnostics.Debug.WriteLine("Motion event received from timemachine.");
                     HandleMotionEvent(data.Data, ref mParsedBytes);
                     break;
                 default:
-                    System.Diagnostics.Debug.WriteLine("Unknown event received from timemachine.");
+                    //System.Diagnostics.Debug.WriteLine("Unknown event received from timemachine.");
                     break;
             }
         }
@@ -194,27 +207,34 @@ namespace TouchPadPCServer
             switch (motion.Action)
             {
                 case MotionEventAction.ACTION_DOWN:
-                    HandleGestureStart();
+                    HandleGestureStart(motion);
                     break;
                 case MotionEventAction.ACTION_UP:
                     HandleGestureFinish();
                     break;
                 case MotionEventAction.ACTION_MOVE:
+                    HandleGestureMove(motion);
                     break;
                 default:
                     break;
             }
         }
 
-        private void HandleGestureStart()
+        private void HandleGestureStart(MotionEvent ent)
         {
+            // update prevX and prevY
+            MotionEvent.PointerCoordsClass pc = ent.PointerCoords[ent.ActionIndex];
+            prevX = pc.X;
+            prevY = pc.Y;
+            initX = prevX;
+            initY = prevY;
         }
 
         private void HandleGestureFinish()
         {
-            System.Diagnostics.Debug.WriteLine(
-                string.Format("HandleGestrueFinish() called. Max pointer count = {0}",
-                mMotionEventTracker.MaxPointerCount));
+            //System.Diagnostics.Debug.WriteLine(
+            //    string.Format("HandleGestrueFinish() called. Max pointer count = {0}",
+            //    mMotionEventTracker.MaxPointerCount));
             if (mMotionEventTracker.MaxPointerCount == 2)
             {
                 // fire right click event
@@ -222,16 +242,45 @@ namespace TouchPadPCServer
             }
             else if (mMotionEventTracker.MaxPointerCount == 1)
             {
-                // of course, this need to be refect
-                // because, if we tap and move with one finger
-                // I don't want fire Click event in this situation
-                OnClick(new EventArgs());
+                if (initX == prevX && initY == prevY)
+                {
+                    OnClick(new EventArgs());
+                }
+            }
+        }
+
+        private void HandleGestureMove(MotionEvent ent)
+        {
+            // movement, we only condier one tap
+            if (mMotionEventTracker.MaxPointerCount == 1)
+            {
+                MotionEvent.PointerCoordsClass pc = null;
+                int actionIndex = ent.ActionIndex;
+                // handle historical infos
+                for (int j = 0; j < ent.HistoricalSize; j++)
+                {
+                    pc = ent.HistoricalPointerCoords[actionIndex][j];
+                    if (pc.X != prevX || pc.Y != prevY)
+                    {
+                        OnMove(new MoveEventArgs(pc.X - prevX, pc.Y - prevY));
+                        prevX = pc.X;
+                        prevY = pc.Y;
+                    }
+                }
+                // handle current infos
+                pc = ent.PointerCoords[actionIndex];
+                if (pc.X != prevX || pc.Y != prevY)
+                {
+                    OnMove(new MoveEventArgs(pc.X - prevX, pc.Y - prevY));
+                    prevX = pc.X;
+                    prevY = pc.Y;
+                }
             }
         }
 
         private void OnClick(EventArgs args)
         {
-            System.Diagnostics.Debug.WriteLine("Fire click event.");
+            //System.Diagnostics.Debug.WriteLine("Fire click event.");
             if (ClickEvent != null)
                 ClickEvent(this, args);
         }
@@ -244,7 +293,7 @@ namespace TouchPadPCServer
 
         private void OnRightClick(EventArgs args)
         {
-            System.Diagnostics.Debug.WriteLine("Fire right click event.");
+            //System.Diagnostics.Debug.WriteLine("Fire right click event.");
             if (RightClickEvent != null)
                 RightClickEvent(this, args);
         }
@@ -253,6 +302,12 @@ namespace TouchPadPCServer
         {
             if (QuitEvent != null)
                 QuitEvent(this, args);
+        }
+
+        private void OnMove(MoveEventArgs args)
+        {
+            if(MoveEvent != null)
+                MoveEvent(this, args);
         }
 
         private TimeMachine mTimeMachine = null;
@@ -270,6 +325,11 @@ namespace TouchPadPCServer
 
         private const int INT_SIZE = 4;
         private int mParsedBytes;
+
+        private float initX;
+        private float initY;
+        private float prevX;
+        private float prevY;
 
         private MotionEventTracker mMotionEventTracker;
     }

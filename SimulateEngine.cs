@@ -64,6 +64,7 @@ namespace TouchPadPCServer
             //mReceiver.DoubleClickEvent += new DoubleClickHandler(mReceiver_DoubleClickEvent);
             mReceiver.RightClickEvent += new RightClickHandler(mReceiver_RightClickEvent);
             mReceiver.QuitEvent += new QuitEventHanlder(mReceiver_QuitEvent);
+            mReceiver.MoveEvent += new MoveEventHandler(mReceiver_MoveEvent);
         }
 
         private void mReceiver_ClickEvent(object sender, EventArgs args)
@@ -85,8 +86,16 @@ namespace TouchPadPCServer
             started = false;
         }
 
+        private void mReceiver_MoveEvent(object sender, MoveEventArgs args)
+        {
+            //Log.d(LOG_TAG,
+            //    string.Format("move event received xDis: {0}, yDis: {1}", args.XDis, args.YDis));
+            sim.Mouse.MoveMouseBy((int)args.XDis, (int)args.YDis);
+        }
+
         private bool started = false;
         private EventReceiver mReceiver;
         private InputSimulator sim;
+        private const string LOG_TAG = "SimulateEngine";
     }
 }
