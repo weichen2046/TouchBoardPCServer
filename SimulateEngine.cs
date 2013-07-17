@@ -90,7 +90,41 @@ namespace TouchPadPCServer
         {
             //Log.d(LOG_TAG,
             //    string.Format("move event received xDis: {0}, yDis: {1}", args.XDis, args.YDis));
-            sim.Mouse.MoveMouseBy((int)args.XDis, (int)args.YDis);
+            //Console.WriteLine(
+            //    string.Format("move event received xDis: {0}, yDis: {1}", args.XDis, args.YDis));
+            //sim.Mouse.MoveMouseBy((int)args.XDis, (int)args.YDis);
+            ContinuousMove((int)args.XDis, (int)args.YDis);
+        }
+
+        private void ContinuousMove(int x, int y)
+        {
+            int absX = Math.Abs(x);
+            int absY = Math.Abs(y);
+            int min = Math.Min(absX, absY);
+            int oneX = (x < 0) ? -1 : 1;
+            int oneY = (y < 0) ? -1 : 1;
+
+            for (int i = 0; i < min; i++)
+            {
+                sim.Mouse.MoveMouseBy(oneX, 0);
+                sim.Mouse.MoveMouseBy(0, oneY);
+            }
+
+            int deta = (min == absX)?(absY - min):(absX - min);
+            if (min == absX)
+            {
+                for (int i = 0; i < deta; i++)
+                {
+                    sim.Mouse.MoveMouseBy(0, oneY);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < deta; i++)
+                {
+                    sim.Mouse.MoveMouseBy(oneX, 0);
+                }
+            }
         }
 
         private bool started = false;
